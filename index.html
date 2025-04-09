@@ -65,7 +65,10 @@
           <strong>${tankstelle.name}</strong><br>
           ${tankstelle.adresse}, ${tankstelle.plz} ${tankstelle.ort}<br>
           ${tankstelle.kanton}, ${tankstelle.land}<br>
-          Marke: ${tankstelle.brand}
+          Marke: ${tankstelle.brand}<br><br>
+          <a href="https://www.google.com/maps/dir/?api=1&destination=${tankstelle.lat},${tankstelle.lng}" target="_blank">
+            📍 Route mit Google Maps
+          </a>
         `;
 
         const marker = L.marker([tankstelle.lat, tankstelle.lng])
