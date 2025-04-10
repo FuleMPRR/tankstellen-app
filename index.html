@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="de">
 <head>
   <meta charset="utf-8" />
   <title>Tankstellen-Karte</title>
@@ -31,13 +31,26 @@
       cursor: pointer;
       box-shadow: 0 2px 6px rgba(0,0,0,0.2);
     }
+    #langSelect {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 1000;
+    }
   </style>
 </head>
 <body>
 
+<!-- Sprachwahl -->
+<div id="langSelect">
+  <button onclick="setLanguage('de')">🇩🇪</button>
+  <button onclick="setLanguage('fr')">🇫🇷</button>
+  <button onclick="setLanguage('it')">🇮🇹</button>
+</div>
+
 <!-- Suchleiste -->
 <div id="searchbar">
-  <input type="text" id="searchInput" placeholder="Suche nach Ort, PLZ oder Name..." />
+  <input type="text" id="searchInput" placeholder="Suche..." />
 </div>
 
 <!-- Karte -->
@@ -48,42 +61,83 @@
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script>
-  let map = L.map('map').setView([46.8, 8.3], 8);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; OpenStreetMap contributors'
-  }).addTo(map);
+const translations = {
+  de: {
+    title: "Tankstellen-Karte",
+    searchPlaceholder: "Suche nach Ort, PLZ oder Name...",
+    locateBtn: "📍 Mein Standort",
+    routeLink: "📍 Route mit Google Maps",
+    userLocation: "📍 Dein Standort",
+    brandLabel: "Marke"
+  },
+  fr: {
+    title: "Carte des stations-service",
+    searchPlaceholder: "Rechercher lieu, code postal ou nom...",
+    locateBtn: "📍 Ma position",
+    routeLink: "📍 Itinéraire avec Google Maps",
+    userLocation: "📍 Votre position",
+    brandLabel: "Marque"
+  },
+  it: {
+    title: "Mappa dei distributori",
+    searchPlaceholder: "Cerca località, CAP o nome...",
+    locateBtn: "📍 La mia posizione",
+    routeLink: "📍 Percorso con Google Maps",
+    userLocation: "📍 La tua posizione",
+    brandLabel: "Marchio"
+  }
+};
 
-  let allMarkers = [];
-  let userMarker = null;
+let currentLang = 'de';
 
-  // Tankstellen-Daten laden
-  fetch('tankstellen.json')
-    .then(response => response.json())
-    .then(data => {
-      data.forEach(tankstelle => {
-        const popupText = `
-          <strong>${tankstelle.name}</strong><br>
-          ${tankstelle.adresse}, ${tankstelle.plz} ${tankstelle.ort}<br>
-          ${tankstelle.kanton}, ${tankstelle.land}<br>
-          Marke: ${tankstelle.brand}<br><br>
-          <a href="https://www.google.com/maps/dir/?api=1&destination=${tankstelle.lat},${tankstelle.lng}" target="_blank">
-            📍 Route mit Google Maps
-          </a>
-        `;
+function setLanguage(lang) {
+  currentLang = lang;
+  document.getElementById('searchInput').placeholder = translations[lang].searchPlaceholder;
+  document.getElementById('locateBtn').innerText = translations[lang].locateBtn;
+  document.title = translations[lang].title;
+  updatePopups();
+}
 
-        const marker = L.marker([tankstelle.lat, tankstelle.lng])
-          .bindPopup(popupText)
-          .addTo(map);
+let map = L.map('map').setView([46.8, 8.3], 8);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; OpenStreetMap contributors'
+}).addTo(map);
 
-        marker._data = tankstelle;
-        allMarkers.push(marker);
-      });
+let allMarkers = [];
+let userMarker = null;
+let markerData = [];
+
+fetch('tankstellen.json')
+  .then(response => response.json())
+  .then(data => {
+    markerData = data;
+    data.forEach(tankstelle => {
+      const marker = L.marker([tankstelle.lat, tankstelle.lng]).addTo(map);
+      marker._data = tankstelle;
+      allMarkers.push(marker);
     });
+    updatePopups();
+  });
 
-  // Suche
+function updatePopups() {
+  allMarkers.forEach(marker => {
+    const tankstelle = marker._data;
+    const popupText = `
+      <strong>${tankstelle.name}</strong><br>
+      ${tankstelle.adresse}, ${tankstelle.plz} ${tankstelle.ort}<br>
+      ${tankstelle.kanton}, ${tankstelle.land}<br>
+      ${translations[currentLang].brandLabel}: ${tankstelle.brand}<br><br>
+      <a href="https://www.google.com/maps/dir/?api=1&destination=${tankstelle.lat},${tankstelle.lng}" target="_blank">
+        ${translations[currentLang].routeLink}
+      </a>
+    `;
+    marker.bindPopup(popupText);
+  });
+}
+
+// Suche
   document.getElementById('searchInput').addEventListener('input', function (e) {
     const query = e.target.value.toLowerCase();
-
     allMarkers.forEach(marker => {
       const { name, ort, plz } = marker._data;
       const match =
@@ -99,7 +153,7 @@
     });
   });
 
-  // Standort-Funktion
+// Standort-Funktion
   document.getElementById('locateBtn').addEventListener('click', () => {
     if (!navigator.geolocation) {
       alert("GPS wird von deinem Gerät nicht unterstützt.");
@@ -113,9 +167,9 @@
         map.removeLayer(userMarker);
       }
 
-      userMarker = L.marker([latitude, longitude], { title: "Du bist hier" })
+      userMarker = L.marker([latitude, longitude], { title: "User" })
         .addTo(map)
-        .bindPopup("📍 Dein Standort")
+        .bindPopup(translations[currentLang].userLocation)
         .openPopup();
 
       map.setView([latitude, longitude], 14);
@@ -123,6 +177,9 @@
       alert("Standort konnte nicht ermittelt werden.");
     });
   });
+
+// Initiale Sprache setzen
+setLanguage(currentLang);
 </script>
 
 </body>
