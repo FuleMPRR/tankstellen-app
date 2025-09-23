@@ -2,221 +2,188 @@
 <html lang="de">
 <head>
   <meta charset="utf-8" />
-  <title>Tankstellen-Karte</title>
+  <title>Ladestationen‑Karte</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <style>
-    body { margin: 0; font-family: sans-serif; }
-    #map { height: 85vh; width: 100%; }
-    #searchbar {
-      padding: 10px;
-      background: #f0f0f0;
-      border-bottom: 1px solid #ccc;
-    }
-    #searchInput {
-      width: 100%;
-      padding: 10px;
-      font-size: 16px;
-      box-sizing: border-box;
-    }
-    #locateBtn {
-      position: absolute;
-      top: 100px;
-      right: 10px;
-      z-index: 1000;
-      background: white;
-      padding: 10px;
-      border: 1px solid #ccc;
-      border-radius: 6px;
-      cursor: pointer;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-    }
-    #langSelect {
-      position: absolute;
-      top: 10px;
-      right: 10px;
-      z-index: 1000;
-    }
+    body { margin: 0; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: #0b0f19; color: #f0f0f0; }
+    #map { height: 85vh; width: 100%; border-radius: 14px; overflow: hidden; }
+    .layout { display:grid; grid-template-columns: 320px 1fr; gap:14px; padding:12px; }
+    .panel { background:#121829; border:1px solid #1f2a44; border-radius:14px; padding:10px; overflow:hidden; display:flex; flex-direction:column; }
+    .panel h2 { margin:6px 8px 8px; font-size:16px; opacity:.9; }
+    .list { overflow:auto; flex:1; padding:6px; }
+    .item { padding:10px; border-radius:10px; border:1px solid #1f2a44; margin-bottom:8px; cursor:pointer; background:#0b0f19; }
+    .item:hover { border-color:#2a3a66; }
+    .item .name { font-weight:600; }
+    .item .sub { font-size:12px; opacity:.8; }
+    .toolbar { display:flex; gap:8px; align-items:center; margin:8px; }
+    .btn { background:#121829; border:1px solid #1f2a44; color:#e6e9ee; padding:8px 10px; border-radius:10px; cursor:pointer; }
+    .btn.active { background:#005AE0; border-color:#005AE0; color:#fff; }
+    @media (max-width: 900px){ .layout { grid-template-columns: 1fr; } .panel { order:2; } }
+    #searchbar { padding: 12px; background: #121829; border-bottom: 1px solid #1f2a44; display:flex; }
+    #searchInput { flex:1; padding: 12px; font-size: 16px; border-radius: 10px; border:1px solid #1f2a44; background:#0b0f19; color:#e6e9ee; }
+    #locateBtn { position: absolute; top: 100px; right: 20px; z-index: 1000; background: #005AE0; color:white; padding: 12px 16px; border: none; border-radius: 10px; cursor: pointer; font-weight:600; box-shadow: 0 4px 12px rgba(0,0,0,0.4); transition: background 0.2s; }
+    #locateBtn:hover { background:#003b95; }
+    #langSelect { position: absolute; top: 20px; right: 20px; z-index: 1000; display:flex; gap:6px; }
+    #langSelect button { background:#121829; border:1px solid #1f2a44; border-radius:8px; padding:6px 8px; cursor:pointer; color:#e6e9ee; }
+    .leaflet-popup-content-wrapper { background:#121829; color:#f0f0f0; border-radius:12px; }
+    .leaflet-popup-tip { background:#121829; }
+    a { color:#4ea3ff; text-decoration:none; }
   </style>
 </head>
 <body>
 
-<!-- Sprachwahl -->
 <div id="langSelect">
   <button onclick="setLanguage('de')">🇩🇪</button>
   <button onclick="setLanguage('fr')">🇫🇷</button>
   <button onclick="setLanguage('it')">🇮🇹</button>
 </div>
 
-<!-- Suchleiste -->
 <div id="searchbar">
   <input type="text" id="searchInput" placeholder="Suche..." />
 </div>
 
-<!-- Karte -->
-<div id="map"></div>
+<div class="layout">
+  <aside class="panel" aria-label="Liste der Ladestationen">
+    <div class="toolbar">
+      <button id="toggleHybrid" class="btn active">Hybrid</button>
+      <button id="toggleImagery" class="btn">Satellit</button>
+    </div>
+    <h2>Stationen</h2>
+    <div id="list" class="list"></div>
+  </aside>
+  <div id="map"></div>
+</div>
 
-<!-- Standort-Button -->
 <div id="locateBtn">📍 Mein Standort</div>
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 <script>
 const translations = {
-  de: {
-    title: "Tankstellen-Karte",
-    searchPlaceholder: "Suche nach Ort, PLZ oder Name...",
-    locateBtn: "📍 Mein Standort",
-    routeLink: "📍 Route mit Google Maps",
-    userLocation: "📍 Dein Standort",
-    brandLabel: "Marke"
-  },
-  fr: {
-    title: "Carte des stations-service",
-    searchPlaceholder: "Rechercher lieu, code postal ou nom...",
-    locateBtn: "📍 Ma position",
-    routeLink: "📍 Itinéraire avec Google Maps",
-    userLocation: "📍 Votre position",
-    brandLabel: "Marque"
-  },
-  it: {
-    title: "Mappa dei distributori",
-    searchPlaceholder: "Cerca località, CAP o nome...",
-    locateBtn: "📍 La mia posizione",
-    routeLink: "📍 Percorso con Google Maps",
-    userLocation: "📍 La tua posizione",
-    brandLabel: "Marchio"
-  }
+  de: { title: "Ladestationen‑Karte", searchPlaceholder: "Suche nach Name oder Ort...", locateBtn: "📍 Mein Standort", routeLink: "📍 Route mit Google Maps", userLocation: "📍 Dein Standort", address: "Adresse" },
+  fr: { title: "Carte des bornes de recharge", searchPlaceholder: "Rechercher par nom ou lieu...", locateBtn: "📍 Ma position", routeLink: "📍 Itinéraire avec Google Maps", userLocation: "📍 Votre position", address: "Adresse" },
+  it: { title: "Mappa delle colonnine", searchPlaceholder: "Cerca per nome o luogo...", locateBtn: "📍 La mia posizione", routeLink: "📍 Percorso con Google Maps", userLocation: "📍 La tua posizione", address: "Indirizzo" }
 };
-
 let currentLang = 'de';
-function setLanguage(lang) {
-  currentLang = lang;
-  document.getElementById('searchInput').placeholder = translations[lang].searchPlaceholder;
-  document.getElementById('locateBtn').innerText = translations[lang].locateBtn;
-  document.title = translations[lang].title;
-  updatePopups();
-}
+function setLanguage(lang){ currentLang=lang; document.getElementById('searchInput').placeholder=translations[lang].searchPlaceholder; document.getElementById('locateBtn').innerText=translations[lang].locateBtn; document.title=translations[lang].title; updatePopups(); }
 
-let map = L.map('map').setView([46.8, 8.3], 8);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  attribution: '&copy; OpenStreetMap contributors'
+let map = L.map('map').setView([46.8,8.3],8);
+const esriImagery = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{ maxZoom:20, attribution:'Tiles © Esri, Sources: Esri, Maxar, Earthstar Geographics, GIS User Community' });
+const esriLabels  = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',{ maxZoom:20, opacity:.9, attribution:'Labels © Esri' });
+const esriRoads   = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}',{ maxZoom:20, opacity:.9, attribution:'Roads © Esri' });
+// Start mit Hybrid (Imagery + Labels + Roads)
+esriImagery.addTo(map); esriLabels.addTo(map); esriRoads.addTo(map);
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',{
+  maxZoom:20,
+  attribution:'Labels © Esri',
+  opacity:0.9
+}).addTo(map);
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}',{
+  maxZoom:20,
+  attribution:'Roads © Esri',
+  opacity:0.9
 }).addTo(map);
 
-let allMarkers = [];
-let userMarker = null;
-let markerData = [];
-let routeLine = null;
+let allMarkers=[], userMarker=null, routeLine=null;
 
-fetch('tankstellen.json')
-  .then(response => response.json())
-  .then(data => {
-    markerData = data;
-    data.forEach(tankstelle => {
-      const marker = L.marker([tankstelle.lat, tankstelle.lng]).addTo(map);
-      marker._data = tankstelle;
-      allMarkers.push(marker);
+async function loadCSV(){
+  const res=await fetch('Google_Maps_Liste.csv', { cache: 'no-store' });
+  let text=await res.text();
+  const parsed=Papa.parse(text,{header:true,skipEmptyLines:true,delimiter:';'});
+  const items=[];
+  for(const raw of parsed.data){
+    const row={};
+    Object.keys(raw||{}).forEach(k=>{ if(!k) return; row[k.trim().toLowerCase()]=String(raw[k]??'').trim(); });
+    const name=row['name']||'';
+    const adresse=row['adresse']||'';
+    const plzOrt=row['plz &ort']||row['plz & ort']||row['plz&ort']||'';
+    const coordRaw=row['koordinaten n/e']||row['koordinaten n-e']||row['koordinaten']||'';
+    const parts=coordRaw.split(/[\s,]+/).filter(Boolean);
+    if(parts.length<2) continue;
+    const lat=parseFloat(parts[0].replace(',','.'));
+    const lng=parseFloat(parts[1].replace(',','.'));
+    if(!isFinite(lat)||!isFinite(lng)) continue;
+    items.push({name,adresse,plzOrt,lat,lng});
+  }
+  return items;
+}
+
+function buildMarkers(data){
+  allMarkers.forEach(m=>map.removeLayer(m));
+  allMarkers=[];
+  const list = document.getElementById('list');
+  list.innerHTML = '';
+  data.forEach((item, idx)=>{
+    const marker=L.marker([item.lat,item.lng]).addTo(map);
+    marker._data=item; marker._idx = idx; allMarkers.push(marker);
+    // Listeneintrag
+    const div = document.createElement('div');
+    div.className='item';
+    div.innerHTML = `<div class="name">${item.name||'Unbenannt'}</div><div class="sub">${item.adresse||''}${item.plzOrt?', '+item.plzOrt:''}</div>`;
+    div.addEventListener('click', ()=>{
+      map.setView([item.lat,item.lng], 15);
+      marker.openPopup();
     });
-    updatePopups();
+    list.appendChild(div);
   });
+  updatePopups();
+  if(allMarkers.length){ const bounds=L.latLngBounds(allMarkers.map(m=>m.getLatLng())); map.fitBounds(bounds.pad(0.2)); }
+});
+  updatePopups();
+  if(allMarkers.length){
+    const bounds=L.latLngBounds(allMarkers.map(m=>m.getLatLng()));
+    map.fitBounds(bounds.pad(0.2));
+  }
+}
 
-function updatePopups() {
-  allMarkers.forEach(marker => {
-    const tankstelle = marker._data;
-    const popupText = `
-      <strong>${tankstelle.name}</strong><br>
-      ${tankstelle.adresse}, ${tankstelle.plz} ${tankstelle.ort}<br>
-      ${tankstelle.kanton}, ${tankstelle.land}<br>
-      ${translations[currentLang].brandLabel}: ${tankstelle.brand}<br><br>
-      <a href="https://www.google.com/maps/dir/?api=1&destination=${tankstelle.lat},${tankstelle.lng}" target="_blank">
-        ${translations[currentLang].routeLink}
-      </a>
-    `;
+function updatePopups(){
+  allMarkers.forEach(marker=>{
+    const p=marker._data;
+    const popupText=`<strong>${p.name}</strong><br>${translations[currentLang].address}: ${p.adresse}, ${p.plzOrt}<br><br><a href="https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}" target="_blank">${translations[currentLang].routeLink}</a>`;
     marker.bindPopup(popupText);
   });
 }
 
-function getDistance(lat1, lon1, lat2, lon2) {
-  function toRad(x) { return x * Math.PI / 180; }
-  const R = 6371;
-  const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon2 - lon1);
-  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
-            Math.sin(dLon/2) * Math.sin(dLon/2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  return R * c;
-}
+function getDistance(lat1,lon1,lat2,lon2){ const R=6371; const toRad=x=>x*Math.PI/180; const dLat=toRad(lat2-lat1),dLon=toRad(lon2-lon1); const a=Math.sin(dLat/2)**2+Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2; return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a)); }
 
-document.getElementById('searchInput').addEventListener('input', function (e) {
-  const query = e.target.value.toLowerCase();
-  allMarkers.forEach(marker => {
-    const { name, ort, plz } = marker._data;
-    const match =
-      name.toLowerCase().includes(query) ||
-      ort.toLowerCase().includes(query) ||
-      plz.includes(query);
-    if (match) {
-      if (!map.hasLayer(marker)) map.addLayer(marker);
-    } else {
-      if (map.hasLayer(marker)) map.removeLayer(marker);
-    }
+document.getElementById('searchInput').addEventListener('input',e=>{
+  const query=e.target.value.toLowerCase();
+  allMarkers.forEach(marker=>{
+    const {name,adresse,plzOrt}=marker._data;
+    const match=(name||'').toLowerCase().includes(query)||(adresse||'').toLowerCase().includes(query)||(plzOrt||'').toLowerCase().includes(query);
+    if(match){ if(!map.hasLayer(marker)) map.addLayer(marker); }
+    else{ if(map.hasLayer(marker)) map.removeLayer(marker); }
   });
 });
 
-document.getElementById('locateBtn').addEventListener('click', () => {
-  if (!navigator.geolocation) {
-    alert("GPS wird von deinem Gerät nicht unterstützt.");
-    return;
-  }
-  navigator.geolocation.getCurrentPosition(position => {
-    const { latitude, longitude } = position.coords;
-
-    if (userMarker) map.removeLayer(userMarker);
-    if (routeLine) map.removeLayer(routeLine);
-
-    const redIcon = new L.Icon({
-      iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png",
-      shadowUrl: "https://unpkg.com/leaflet@1.9.3/dist/images/marker-shadow.png",
-      iconSize: [25, 41],
-      iconAnchor: [12, 41],
-      popupAnchor: [1, -34],
-      shadowSize: [41, 41]
-    });
-
-    userMarker = L.marker([latitude, longitude], { icon: redIcon, title: "User" })
-      .addTo(map)
-      .bindPopup(translations[currentLang].userLocation)
-      .openPopup();
-
-    map.setView([latitude, longitude], 14);
-
-    let nearestMarker = null;
-    let minDistance = Infinity;
-    allMarkers.forEach(marker => {
-      const dist = getDistance(latitude, longitude, marker._latlng.lat, marker._latlng.lng);
-      if (dist < minDistance) {
-        minDistance = dist;
-        nearestMarker = marker;
-      }
-    });
-
-    if (nearestMarker) {
-      nearestMarker.openPopup();
-      map.panTo(nearestMarker.getLatLng());
-
-      // Route zeichnen
-      routeLine = L.polyline([
-        [latitude, longitude],
-        [nearestMarker.getLatLng().lat, nearestMarker.getLatLng().lng]
-      ], { color: 'blue', weight: 4, dashArray: '5, 10' }).addTo(map);
-    }
-
-  }, () => {
-    alert("Standort konnte nicht ermittelt werden.");
-  });
+document.getElementById('locateBtn').addEventListener('click',()=>{
+  if(!navigator.geolocation){ alert("GPS wird von deinem Gerät nicht unterstützt."); return; }
+  navigator.geolocation.getCurrentPosition(pos=>{
+    const {latitude,longitude}=pos.coords;
+    if(userMarker) map.removeLayer(userMarker);
+    if(routeLine) map.removeLayer(routeLine);
+    const redIcon=new L.Icon({iconUrl:"https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png",shadowUrl:"https://unpkg.com/leaflet@1.9.3/dist/images/marker-shadow.png",iconSize:[25,41],iconAnchor:[12,41],popupAnchor:[1,-34],shadowSize:[41,41]});
+    userMarker=L.marker([latitude,longitude],{icon:redIcon}).addTo(map).bindPopup(translations[currentLang].userLocation).openPopup();
+    map.setView([latitude,longitude],14);
+    let nearestMarker=null,minDist=Infinity;
+    allMarkers.forEach(marker=>{ const d=getDistance(latitude,longitude,marker._latlng.lat,marker._latlng.lng); if(d<minDist){minDist=d;nearestMarker=marker;} });
+    if(nearestMarker){ nearestMarker.openPopup(); map.panTo(nearestMarker.getLatLng()); routeLine=L.polyline([[latitude,longitude],[nearestMarker.getLatLng().lat,nearestMarker.getLatLng().lng]],{color:'cyan',weight:4,dashArray:'5, 10'}).addTo(map); }
+  },()=>{ alert("Standort konnte nicht ermittelt werden."); });
 });
 
-setLanguage(currentLang);
+(async function init(){
+  const data=await loadCSV();
+  buildMarkers(data);
+  setLanguage(currentLang);
+  // Layer-Buttons
+  const bHybrid = document.getElementById('toggleHybrid');
+  const bImagery = document.getElementById('toggleImagery');
+  function setHybrid(){ bHybrid.classList.add('active'); bImagery.classList.remove('active'); esriImagery.addTo(map); esriLabels.addTo(map); esriRoads.addTo(map); }
+  function setImagery(){ bImagery.classList.add('active'); bHybrid.classList.remove('active'); esriLabels.remove(); esriRoads.remove(); esriImagery.addTo(map); }
+  bHybrid.addEventListener('click', setHybrid);
+  bImagery.addEventListener('click', setImagery);
+})();
 </script>
 </body>
 </html>
