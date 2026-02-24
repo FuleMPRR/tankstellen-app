@@ -154,17 +154,6 @@
     "lng": 6.235584
   },
   {
-    "name": "MP Service Chavornay",
-    "adresse": "Rue de la Gare 2",
-    "plz": "1373",
-    "ort": "Chavornay",
-    "kanton": "VD",
-    "land": "Schweiz",
-    "brand": "MP",
-    "lat": 46.709451,
-    "lng": 6.570543
-  },
-  {
     "name": "MP Service Yverdon",
     "adresse": "Avenue Haldimand 81",
     "plz": "1400",
