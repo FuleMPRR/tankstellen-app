@@ -2442,17 +2442,6 @@
     "lng": 7.845245
   },
   {
-    "name": "RR Service Aarau",
-    "adresse": "Gysulastrasse 1",
-    "plz": "5000",
-    "ort": "Aarau Altstadt",
-    "kanton": "AG",
-    "land": "Schweiz",
-    "brand": "RR",
-    "lat": 47.397067,
-    "lng": 8.040962
-  },
-  {
     "name": "RR Tankstelle Niedergösgen",
     "adresse": "Hauptstrasse 80",
     "plz": "5013",
